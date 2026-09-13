@@ -29,7 +29,7 @@ START_TIME = time.time()
 # Each entry: (command usage, short description)
 # Add new commands here. The paginator handles splitting into pages of 5.
 HELP_ENTRIES = [
-    ("!murder @user", "jeff the kills the user🔪🔪"),
+    ("!murder @user", "jeff the kills the user🔪"),
     ("!unmurder @user", "revives them💖 (no mention = revives yourself)"),
     ("!murdered", "lists everyone currently murdered"),
     ("!gamble", "rolls a d20"),
@@ -220,7 +220,7 @@ async def on_message(message):
 @commands.has_permissions(manage_messages=True)
 async def murder(ctx, member: discord.Member = None):
     if member is None:
-        await ctx.send("YOU NEED TO PING SOMEONE TO MURDER. USAGE: `!murder @user`")
+        await ctx.send("YOU NEED TO PING SOMEONE TO MURDER.)
         return
 
     if member.id == bot.user.id:
@@ -244,7 +244,7 @@ async def unmurder(ctx, member: discord.Member = None):
 
     murdered_set = murdered_users.get(ctx.guild.id, set())
     if member.id not in murdered_set:
-        await ctx.send(f"{member.mention} ISN'T MURDERED, DUMBASS.")
+        await ctx.send(f"{member.mention} ISN'T MURDERED DUMBASS.")
         return
 
     murdered_set.discard(member.id)
@@ -255,7 +255,7 @@ async def unmurder(ctx, member: discord.Member = None):
 async def murdered(ctx):
     ids = murdered_users.get(ctx.guild.id, set())
     if not ids:
-        await ctx.send("NO ONE IS MURDERED.")
+        await ctx.send("NO VICTIMS YET👀.")
         return
     mentions = ", ".join(f"<@{i}>" for i in ids)
     await ctx.send(f"CURRENTLY MURDERED: {mentions}")
@@ -322,7 +322,7 @@ async def cat(ctx):
 @bot.command()
 async def ping(ctx):
     latency_ms = round(bot.latency * 1000)
-    await ctx.send(f"🏓 PONG! LATENCY: {latency_ms}MS")
+    await ctx.send(f"LATENCY: {latency_ms}MS")
 
 
 @bot.command()
