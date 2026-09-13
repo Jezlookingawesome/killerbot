@@ -11,8 +11,8 @@ It also has gambling, a cat command, and other nonsense.
 ## Commands
 
 **Murder**
-- `!murder @user` — jeff the kills the user🔪
-- `!unmurder @user` — revives them💖 (no mention = revives yourself)
+- `!murder @user` — jeff the kills the user
+- `!unmurder @user` — revives them (no mention = revives yourself)
 - `!murdered` — lists everyone currently murdered
 
 **Gambling**
@@ -82,7 +82,7 @@ The greyscale pfp is fetched from [some-random-api.com](https://some-random-api.
 
 ## Credits
 
-- Made by **[jezlookingawesome]**
+- Made by **jezlookingawesome**
 - Hosted on Railway
 - Greyscale service: [some-random-api.com](https://some-random-api.com)
 - Cat service: [thecatapi.com](https://thecatapi.com)
@@ -91,4 +91,4 @@ The greyscale pfp is fetched from [some-random-api.com](https://some-random-api.
 
 ## License
 
-Do whatever you want with it.
+literally just do whatever you want with this.
