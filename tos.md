@@ -1,6 +1,6 @@
 Terms of Service — Killer Bot
 
-Last updated: [date]
+Last updated: 09/13/2026
 
 By inviting or using Killer ("the Bot"), you agree to these terms.
 
