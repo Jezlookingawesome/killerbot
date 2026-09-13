@@ -25,6 +25,74 @@ JACKPOT_ROLE_COLOR = discord.Color.from_rgb(0, 255, 0)
 
 START_TIME = time.time()
 
+# ----- HELP PAGES -----
+# Each entry: (command usage, short description)
+# Add new commands here. The paginator handles splitting into pages of 5.
+HELP_ENTRIES = [
+    ("!murder @user", "jeff the kills the user🔪🔪"),
+    ("!unmurder @user", "revives them💖 (no mention = revives yourself)"),
+    ("!murdered", "lists everyone currently murdered"),
+    ("!gamble", "rolls a d20"),
+    ("!jgamble", "same as gamble, but if you roll below 10 you DIE"),
+    ("!highstakes", "rolls a d1000"),
+    ("!roulette", "1/6 chance of getting murdered"),
+    ("!cat", "posts a random cat image"),
+    ("!ping", "shows the bot's latency"),
+    ("!stats", "shows bot stats"),
+    ("!credits", "shows who made the bot"),
+]
+
+COMMANDS_PER_PAGE = 5
+HELP_COLOR = discord.Color.from_rgb(180, 20, 20)  # blood red
+
+
+def build_help_embed(page: int):
+    total_pages = max(1, (len(HELP_ENTRIES) + COMMANDS_PER_PAGE - 1) // COMMANDS_PER_PAGE)
+    page = max(0, min(page, total_pages - 1))
+
+    start = page * COMMANDS_PER_PAGE
+    end = start + COMMANDS_PER_PAGE
+    chunk = HELP_ENTRIES[start:end]
+
+    embed = discord.Embed(
+        title="KILLER — COMMANDS",
+        description=f"**Prefix: !**\nPage {page + 1}/{total_pages}",
+        color=HELP_COLOR,
+    )
+    for usage, desc in chunk:
+        embed.add_field(name=usage, value=desc, inline=False)
+    embed.set_footer(text="Use the buttons below to flip pages")
+    return embed, total_pages
+
+
+class HelpView(discord.ui.View):
+    def __init__(self, page: int = 0):
+        super().__init__(timeout=180)
+        self.page = page
+        total_pages = max(1, (len(HELP_ENTRIES) + COMMANDS_PER_PAGE - 1) // COMMANDS_PER_PAGE)
+        self.total_pages = total_pages
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.prev_button.disabled = self.page <= 0
+        self.next_button.disabled = self.page >= self.total_pages - 1
+
+    @discord.ui.button(label="◀ Prev", style=discord.ButtonStyle.secondary)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page > 0:
+            self.page -= 1
+        self._update_buttons()
+        embed, _ = build_help_embed(self.page)
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.page < self.total_pages - 1:
+            self.page += 1
+        self._update_buttons()
+        embed, _ = build_help_embed(self.page)
+        await interaction.response.edit_message(embed=embed, view=self)
+
 
 def grey_url(user):
     avatar = str(user.display_avatar.with_size(256).url)
@@ -73,24 +141,6 @@ async def ensure_jackpot_role(guild):
 async def ensure_jackpot_roles_all():
     for guild in bot.guilds:
         await ensure_jackpot_role(guild)
-
-
-HELP_TEXT = (
-    "**Prefix: !**\n\n"
-    "**Commands**\n"
-    "murder @user — jeff the kills the user🔪🔪\n"
-    "unmurder @user — revives them💖 (no mention = revives yourself)\n"
-    "murdered — lists everyone currently murdered\n"
-    "gamble — rolls a d20\n"
-    "jgamble — same as gamble, but if you roll below 10 you DIE\n"
-    "highstakes — rolls a d1000\n"
-    "roulette — 1/6 chance of getting murdered\n"
-    "cat — posts a random cat image\n"
-    "ping — shows the bot's latency\n"
-    "stats — shows bot stats\n"
-    "credits — shows who made the bot\n"
-    "help — shows this list (use `/help` slash command)"
-)
 
 
 def format_uptime(seconds):
@@ -300,7 +350,9 @@ async def credits(ctx):
 
 @bot.tree.command(name="help", description="Shows all of Killer's commands")
 async def help_slash(interaction: discord.Interaction):
-    await interaction.response.send_message(HELP_TEXT)
+    embed, _ = build_help_embed(0)
+    view = HelpView(page=0)
+    await interaction.response.send_message(embed=embed, view=view)
 
 
 try:
