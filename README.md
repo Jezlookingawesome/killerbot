@@ -97,10 +97,10 @@ literally just do whatever you want with this.
 
 ## tarnisheds
 
-![demo1](https://klipy.com/gifs/the-battle-bricks-tarnished-battler.gif)
+![battler](./thebattlebricks-tarnishedbattler.gif)
 
-![demo2](https://klipy.com/gifs/the-battle-bricks-tarnished-trowel.gif)
+![trowel](./the-battle-bricks-tarnished-trowel.gif)
 
-![demo3](https://klipy.com/gifs/tarnished-sword.gif)
+![spin](./spin-speen.gif)
 
-![demo4](https://klipy.com/gifs/tarnished-destruction.gif)
+![blight](./blight-the-battle-bricks.gif)
