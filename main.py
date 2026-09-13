@@ -220,7 +220,7 @@ async def on_message(message):
 @commands.has_permissions(manage_messages=True)
 async def murder(ctx, member: discord.Member = None):
     if member is None:
-        await ctx.send("YOU NEED TO PING SOMEONE TO MURDER.)
+        await ctx.send("YOU NEED TO PING SOMEONE TO MURDER.")
         return
 
     if member.id == bot.user.id:
