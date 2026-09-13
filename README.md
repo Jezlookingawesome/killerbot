@@ -92,3 +92,15 @@ The greyscale pfp is fetched from [some-random-api.com](https://some-random-api.
 ## License
 
 literally just do whatever you want with this.
+
+---
+
+## tarnisheds
+
+![demo](https://klipy.com/gifs/the-battle-bricks-tarnished-battler)
+
+![demo](https://klipy.com/gifs/the-battle-bricks-tarnished-trowel)
+
+![demo](https://klipy.com/gifs/tarnished-sword)
+
+![demo](https://klipy.com/gifs/tarnished-destruction)
