@@ -237,7 +237,8 @@ async def smart_reply(ctx, text):
             return
 
         msg_link = f"https://discord.com/channels/{ctx.guild.id}/{ctx.channel.id}/{ctx.message.id}"
-        content = f"> [Replying to:]({msg_link}) {ctx.author.mention}\n> {text}\n{text}"
+        original = ctx.message.content
+        content = f"> [Replying to:]({msg_link}) {ctx.author.mention}\n> {original}\n{text}"
 
         async with aiohttp.ClientSession() as session:
             wh = Webhook.from_url(webhook.url, session=session)
@@ -252,7 +253,7 @@ async def smart_reply(ctx, text):
                 await ctx.reply(text)
     else:
         await ctx.reply(text)
-
+        
 
 async def ensure_jackpot_role(guild):
     role = discord.utils.get(guild.roles, name=JACKPOT_ROLE_NAME)
