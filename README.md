@@ -29,6 +29,7 @@ It also has gambling, a cat command, and other nonsense.
 - `!stats` — shows bot stats
 - `!credits` — shows who made the bot
 - `/help` — paginated command list (slash command)
+-# (there's way more commands because I can update the bot but I don't wanna update the readme, so I guess this one just includes the main commands of the bot)
 
 ---
 
