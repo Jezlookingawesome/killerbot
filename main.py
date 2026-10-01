@@ -146,14 +146,23 @@ class CategorySelect(discord.ui.Select):
         view.add_item(view.category_select)
 
         embed, _ = build_help_embed(view.category_key, view.page)
-        await interaction.response.edit_message(embed=embed, view=view)
+        try:
+            await interaction.response.edit_message(embed=embed, view=view)
+        except discord.NotFound:
+            await interaction.followup.send(
+                "INTERACTION TIMEOUT — RUN `/help` AGAIN.",
+                ephemeral=True,
+            )
+        except discord.HTTPException:
+            pass
 
 
 class HelpView(discord.ui.View):
-    def __init__(self, category_key: str = "all", page: int = 0):
+    def __init__(self, category_key: str = "all", page: int = 0, author_id: int = None):
         super().__init__(timeout=180)
         self.category_key = category_key
         self.page = page
+        self.author_id = author_id
         commands = get_category_commands(category_key)
         self.total_pages = max(1, (len(commands) + COMMANDS_PER_PAGE - 1) // COMMANDS_PER_PAGE)
 
@@ -166,13 +175,30 @@ class HelpView(discord.ui.View):
         self.prev_button.disabled = self.page <= 0
         self.next_button.disabled = self.page >= self.total_pages - 1
 
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if self.author_id is not None and interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "FAILED INTERACTION — YOU'RE NOT THE ONE WHO TRIGGERED THE COMMAND.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
     @discord.ui.button(label="◀ Prev", style=discord.ButtonStyle.secondary, row=0)
     async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.page > 0:
             self.page -= 1
         self._update_buttons()
         embed, _ = build_help_embed(self.category_key, self.page)
-        await interaction.response.edit_message(embed=embed, view=self)
+        try:
+            await interaction.response.edit_message(embed=embed, view=self)
+        except discord.NotFound:
+            await interaction.followup.send(
+                "INTERACTION TIMEOUT — RUN `/help` AGAIN.",
+                ephemeral=True,
+            )
+        except discord.HTTPException:
+            pass
 
     @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.secondary, row=0)
     async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -180,7 +206,15 @@ class HelpView(discord.ui.View):
             self.page += 1
         self._update_buttons()
         embed, _ = build_help_embed(self.category_key, self.page)
-        await interaction.response.edit_message(embed=embed, view=self)
+        try:
+            await interaction.response.edit_message(embed=embed, view=self)
+        except discord.NotFound:
+            await interaction.followup.send(
+                "INTERACTION TIMEOUT — RUN `/help` AGAIN.",
+                ephemeral=True,
+            )
+        except discord.HTTPException:
+            pass
 
 
 def grey_url(user):
@@ -253,8 +287,8 @@ async def smart_reply(ctx, text):
                 await ctx.reply(text)
     else:
         await ctx.reply(text)
-      
-  async def ensure_jackpot_role(guild):
+
+async def ensure_jackpot_role(guild):
     role = discord.utils.get(guild.roles, name=JACKPOT_ROLE_NAME)
     if role is not None:
         return role
@@ -322,7 +356,6 @@ async def on_message(message):
     muted = murdered_users.get(message.guild.id, set())
 
     if message.author.id in muted and message.content.startswith(bot.command_prefix):
-        # Let these specific commands through so murdered users can free themselves
         allowed_while_murdered = ("!unmurder", "!spin", "!emptychamber", "!help", "!checkchamber")
         parts = message.content.split()
         first_word = parts[0].lower() if parts else ""
@@ -707,7 +740,7 @@ async def credits(ctx):
 @bot.tree.command(name="help", description="Shows all of Killer's commands")
 async def help_slash(interaction: discord.Interaction):
     embed, _ = build_help_embed("all", 0)
-    view = HelpView(category_key="all", page=0)
+    view = HelpView(category_key="all", page=0, author_id=interaction.user.id)
     await interaction.response.send_message(embed=embed, view=view)
 
 
