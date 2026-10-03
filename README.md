@@ -1,10 +1,10 @@
-# 🔪 Killer
+# ✨ Starlight
 
-> A Discord bot that jeff the kills people. (Also has other fun stuff)
+> A Discord bot that can maybe assist you. (Also has other fun stuff)
 
-Killer is a joke/meme Discord bot. When someone gets "murdered," their profile picture turns greyscale and every message they send is replaced with a blank message under their name. They stay that way until someone revives them.
+Starlight is a joke/meme Discord bot. When someone gets "murdered," their profile picture turns greyscale and every message they send is replaced with a blank message under their name. They stay that way until someone revives them.
 
-It also has gambling, a cat command, and other nonsense.
+It also has gambling, and other general commands..
 
 ---
 
