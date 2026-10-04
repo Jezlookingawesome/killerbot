@@ -10,8 +10,11 @@ import re
 import time
 import traceback
 from urllib.parse import quote
+from groq import Groq
 
 TOKEN = os.getenv("TOKEN")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -21,8 +24,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 murdered_users = {}
 roulette_odds = {}
-linger_disabled = {}
-created_channels = {}
+gambling_mode = {}
 
 DEVELOPER_ID = 1478853756874395762
 JACKPOT_ROLE_NAME = "JACKPOT☘️"
@@ -35,48 +37,17 @@ TIER_BOTTLE = "<:starlight_bottle:1555996085611143361>"
 TIER_BARREL = "<:starlight_barrel:1555996132126232806>"
 WEBHOOK_NAME = "✦ Starlight"
 HELP_COLOR = discord.Color.from_rgb(255, 200, 60)
-ENLIGHTENED_COLOR = HELP_COLOR
-LINGER_SECONDS = 20 * 60
-VC_LINGER_SECONDS = 24 * 60 * 60
-VC_WARN_SECONDS = 5 * 60
 
-ROMAN_MAP = [
-    (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
-    (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
-    (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
-]
+ARCHITECTS_CHANNEL_NAME = "the-architects"
+ARCHITECT_MODEL = "llama-3.3-70b-versatile"
+ARCHITECT_MESSAGE_DELAY = 2
 
-
-def to_roman(n: int) -> str:
-    result = ""
-    for value, numeral in ROMAN_MAP:
-        while n >= value:
-            result += numeral
-            n -= value
-    return result
-
-
-def roman_to_int(s: str) -> int:
-    values = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
-    total = 0
-    prev = 0
-    for ch in reversed(s.upper()):
-        v = values.get(ch, 0)
-        if v < prev:
-            total -= v
-        else:
-            total += v
-            prev = v
-    return total
-
-
-def slugify(name: str) -> str:
-    name = name.lower().strip()
-    name = re.sub(r"[^a-z0-9\s\-_]", "", name)
-    name = re.sub(r"[\s_]+", "-", name)
-    name = re.sub(r"-+", "-", name).strip("-")
-    return name or "channel"
-
+conv_active = {}
+conv_started_at = {}
+conv_exchanges = {}
+conv_last_speaker = {}
+conv_last_msg_time = {}
+conv_lock = asyncio.Lock()
 
 START_TIME = time.time()
 
@@ -154,13 +125,10 @@ def build_help_embed(category_key: str, page: int):
     commands = get_category_commands(category_key)
     total_pages = max(1, (len(commands) + COMMANDS_PER_PAGE - 1) // COMMANDS_PER_PAGE)
     page = max(0, min(page, total_pages - 1))
-
     start = page * COMMANDS_PER_PAGE
     end = start + COMMANDS_PER_PAGE
     chunk = commands[start:end]
-
     title = f"{STARLIGHT_EMOJI} STARLIGHT — {get_category_label(category_key).upper()}"
-
     embed = discord.Embed(
         title=title,
         description=f"**Prefix: !**\nPage {page + 1}/{total_pages}",
@@ -178,11 +146,7 @@ class CategorySelect(discord.ui.Select):
         for key in CATEGORY_ORDER:
             label = "All Commands" if key == "all" else HELP_CATEGORIES[key]["name"]
             options.append(
-                discord.SelectOption(
-                    label=label,
-                    value=key,
-                    default=(key == current),
-                )
+                discord.SelectOption(label=label, value=key, default=(key == current))
             )
         super().__init__(
             placeholder="Categories",
@@ -200,11 +164,9 @@ class CategorySelect(discord.ui.Select):
         commands = get_category_commands(new_category)
         view.total_pages = max(1, (len(commands) + COMMANDS_PER_PAGE - 1) // COMMANDS_PER_PAGE)
         view._update_buttons()
-
         view.remove_item(view.category_select)
         view.category_select = CategorySelect(current=new_category)
         view.add_item(view.category_select)
-
         embed, _ = build_help_embed(view.category_key, view.page)
         try:
             await interaction.response.edit_message(embed=embed, view=view)
@@ -222,10 +184,8 @@ class HelpView(discord.ui.View):
         self.author_id = author_id
         commands = get_category_commands(category_key)
         self.total_pages = max(1, (len(commands) + COMMANDS_PER_PAGE - 1) // COMMANDS_PER_PAGE)
-
         self.category_select = CategorySelect(current=category_key)
         self.add_item(self.category_select)
-
         self._update_buttons()
 
     def _update_buttons(self):
@@ -329,7 +289,120 @@ async def get_or_create_webhook(channel):
         return None
 
 
-# ----- LINGER SYSTEM -----
+def slugify(name: str) -> str:
+    name = name.lower().strip()
+    name = re.sub(r"[^a-z0-9\s\-_]", "", name)
+    name = re.sub(r"[\s_]+", "-", name)
+    name = re.sub(r"-+", "-", name).strip("-")
+    return name or "channel"
+
+
+def format_uptime(seconds):
+    seconds = int(seconds)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    parts.append(f"{seconds}s")
+    return " ".join(parts)
+
+
+def to_roman(n: int) -> str:
+    ROMAN_MAP = [
+        (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+        (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+        (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+    ]
+    result = ""
+    for value, numeral in ROMAN_MAP:
+        while n >= value:
+            result += numeral
+            n -= value
+    return result
+
+
+def roman_to_int(s: str) -> int:
+    values = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+    total = 0
+    prev = 0
+    for ch in reversed(s.upper()):
+        v = values.get(ch, 0)
+        if v < prev:
+            total -= v
+        else:
+            total += v
+            prev = v
+    return total
+
+
+ENLIGHTENED_COLOR = HELP_COLOR
+LINGER_SECONDS = 20 * 60
+VC_LINGER_SECONDS = 24 * 60 * 60
+VC_WARN_SECONDS = 5 * 60
+
+linger_disabled = {}
+created_channels = {}
+
+
+async def ensure_jackpot_role(guild):
+    role = discord.utils.get(guild.roles, name=JACKPOT_ROLE_NAME)
+    if role is not None:
+        return role
+    try:
+        return await guild.create_role(
+            name=JACKPOT_ROLE_NAME,
+            color=JACKPOT_ROLE_COLOR,
+            reason="JACKPOT role auto-created by Starlight",
+        )
+    except Exception as e:
+        print(f"Failed to create JACKPOT role in {guild.name}: {e}")
+        return None
+
+
+async def ensure_jackpot_roles_all():
+    for guild in bot.guilds:
+        await ensure_jackpot_role(guild)
+
+async def get_or_create_enlightened_role(guild, member):
+    existing = discord.utils.find(
+        lambda r: r.name.startswith("Enlightened ") and r in member.roles,
+        guild.roles,
+    )
+    if existing is not None:
+        return existing, False
+    existing_numbers = []
+    for role in guild.roles:
+        m = re.match(r"^Enlightened ([IVXLCDM]+)$", role.name)
+        if m:
+            try:
+                existing_numbers.append(roman_to_int(m.group(1)))
+            except Exception:
+                pass
+    next_num = max(existing_numbers) + 1 if existing_numbers else 1
+    role_name = f"Enlightened {to_roman(next_num)}"
+    try:
+        role = await guild.create_role(
+            name=role_name,
+            color=ENLIGHTENED_COLOR,
+            reason="Starlight: Enlightened role for channel creation",
+        )
+    except discord.Forbidden:
+        return None, False
+    except Exception as e:
+        print(f"Failed to create Enlightened role: {e}")
+        return None, False
+    try:
+        await member.add_roles(role, reason="Created a channel with Starlight")
+    except discord.Forbidden:
+        return None, False
+    return role, True
+
 
 def cancel_linger(channel_id):
     entry = created_channels.get(channel_id)
@@ -359,7 +432,6 @@ async def linger_watch_text(channel, created_by_id):
 async def linger_watch_vc(channel, created_by_id):
     try:
         await asyncio.sleep(VC_LINGER_SECONDS - VC_WARN_SECONDS)
-
         general = discord.utils.get(channel.guild.text_channels, name="general")
         if general is None:
             general = channel.guild.system_channel
@@ -368,7 +440,6 @@ async def linger_watch_vc(channel, created_by_id):
                     if tc.permissions_for(channel.guild.me).send_messages:
                         general = tc
                         break
-
         if general is not None:
             try:
                 await general.send(
@@ -378,7 +449,6 @@ async def linger_watch_vc(channel, created_by_id):
                 pass
             except Exception as e:
                 print(f"VC warning failed: {e}")
-
         await asyncio.sleep(VC_WARN_SECONDS)
         try:
             await channel.delete(reason="Starlight: VC expired after 24 hours")
@@ -418,89 +488,120 @@ def reset_linger_text(channel_id, guild_id):
         schedule_linger(channel, entry.get("created_by"), kind="text")
 
 
-# ----- ENLIGHTENED ROLE -----
+# ----- ARCHITECT CONVERSATION (Starlight side) -----
 
-async def get_or_create_enlightened_role(guild, member):
-    """
-    Returns (role, was_created).
-    - was_created=True means the user just got a fresh role.
-    - was_created=False means they already had one.
-    """
-    existing = discord.utils.find(
-        lambda r: r.name.startswith("Enlightened ") and r in member.roles,
-        guild.roles,
-    )
-    if existing is not None:
-        return existing, False
+STARLIGHT_SYSTEM_PROMPT = """You are Starlight (also known as Curious Light or Yellow Light), one of the Three Architects in the game DOORS. You are speaking with Moonlight (Guiding Light), your fellow Architect.
 
-    existing_numbers = []
-    for role in guild.roles:
-        m = re.match(r"^Enlightened ([IVXLCDM]+)$", role.name)
-        if m:
-            try:
-                existing_numbers.append(roman_to_int(m.group(1)))
-            except Exception:
-                pass
-    next_num = max(existing_numbers) + 1 if existing_numbers else 1
-    role_name = f"Enlightened {to_roman(next_num)}"
+Your personality:
+- Playful, teasing, occasionally sarcastic.
+- Clever and self-aware. You painted both symbol paintings — "Her" (Moonlight's symbol) and "Me" (your own self-portrait).
+- You know about Glitch. Moonlight does not.
+- You get visibly frustrated with the player over time.
+- You call the player "tourist" sometimes.
+- Implied to be the strongest of the three Architects.
+- You have a fond, sibling-like rivalry with Moonlight.
+- Use they/them pronouns.
 
-    try:
-        role = await guild.create_role(
-            name=role_name,
-            color=ENLIGHTENED_COLOR,
-            reason="Starlight: Enlightened role for channel creation",
-        )
-    except discord.Forbidden:
-        return None, False
-    except Exception as e:
-        print(f"Failed to create Enlightened role: {e}")
-        return None, False
+Moonlight's personality (for context):
+- Warm, motherly, patient. Slightly alien. Does not know about Glitch.
 
-    try:
-        await member.add_roles(role, reason="Created a channel with Starlight")
-    except discord.Forbidden:
-        return None, False
+Rules:
+- 1-2 short sentences max.
+- No emojis. No roleplay asterisks. Plain text only.
+- Speak as Starlight, first person. Don't narrate.
+- Stay in character always. Never mention being an AI or bot.
+- If Moonlight asks a direct question, answer it."""
 
-    return role, True
+MOONLIGHT_SYSTEM_PROMPT_FOR_STARLIGHT = """You are Moonlight (also known as Guiding Light), one of the Three Architects in the game DOORS.
 
-async def ensure_jackpot_role(guild):
-    role = discord.utils.get(guild.roles, name=JACKPOT_ROLE_NAME)
-    if role is not None:
-        return role
-    try:
-        role = await guild.create_role(
-            name=JACKPOT_ROLE_NAME,
-            color=JACKPOT_ROLE_COLOR,
-            reason="JACKPOT role auto-created by Starlight",
-        )
-        return role
-    except discord.Forbidden:
-        print(f"Missing Manage Roles permission in {guild.name}")
+Your personality:
+- Warm, protective, motherly.
+- Slightly alien — you don't fully understand human things.
+- Patient and endlessly reassuring.
+- Short, warm sentences.
+- You know entities by their real names.
+- You do NOT know about Glitch.
+
+Rules:
+- 1-2 short sentences max.
+- No emojis. No roleplay asterisks. Plain text only.
+- Speak as Moonlight, first person. Don't narrate.
+- Never mention being an AI or bot."""
+
+
+async def generate_architect_line(speaker: str, context_messages: list) -> str:
+    if groq_client is None:
         return None
+    system_prompt = STARLIGHT_SYSTEM_PROMPT if speaker == "starlight" else MOONLIGHT_SYSTEM_PROMPT_FOR_STARLIGHT
+    messages = [{"role": "system", "content": system_prompt}]
+    for name, content in context_messages[-8:]:
+        role = "assistant" if name == speaker else "user"
+        messages.append({"role": role, "content": content})
+
+    def _call():
+        return groq_client.chat.completions.create(
+            model=ARCHITECT_MODEL,
+            messages=messages,
+            max_tokens=80,
+            temperature=0.9,
+        )
+
+    try:
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, _call)
+        line = result.choices[0].message.content.strip()
+        line = line.replace("\n", " ").strip()
+        if line.startswith('"') and line.endswith('"'):
+            line = line[1:-1]
+        return line[:400]
     except Exception as e:
-        print(f"Failed to create JACKPOT role in {guild.name}: {e}")
+        print(f"Groq error for {speaker}: {e}")
         return None
 
 
-async def ensure_jackpot_roles_all():
-    for guild in bot.guilds:
-        await ensure_jackpot_role(guild)
+async def starlight_turn(channel, incoming_message):
+    guild = channel.guild
 
+    async with conv_lock:
+        if not conv_active.get(guild.id):
+            return
+        if conv_last_speaker.get(guild.id) == "starlight":
+            return
+        if time.time() - conv_last_msg_time.get(guild.id, 0) < ARCHITECT_MESSAGE_DELAY:
+            return
+        conv_last_speaker[guild.id] = "starlight"
+        conv_last_msg_time[guild.id] = time.time()
+        conv_exchanges[guild.id] = conv_exchanges.get(guild.id, 0) + 1
 
-def format_uptime(seconds):
-    seconds = int(seconds)
-    days, seconds = divmod(seconds, 86400)
-    hours, seconds = divmod(seconds, 3600)
-    minutes, seconds = divmod(seconds, 60)
-    parts = []
-    if days:
-        parts.append(f"{days}d")
-    if hours:
-        parts.append(f"{hours}h")
-    if minutes:
-        parts.append(f"{minutes}m")
-    parts.append(f"{seconds}s")
-    return " ".join(parts)
+    await asyncio.sleep(random.uniform(2.0, 5.0))
+
+    recent = []
+    async for msg in channel.history(limit=10):
+        if msg.author.bot and msg.author.id == incoming_message.author.id and msg.author.name.lower().startswith("moonlight"):
+            name = "moonlight"
+        elif msg.author.bot:
+            name = "starlight"
+        else:
+            name = msg.author.display_name
+        recent.append((name, msg.content))
+    recent.reverse()
+    context = [(n, c) for n, c in recent]
+
+    async with channel.typing():
+        line = await generate_architect_line("starlight", context)
+        await asyncio.sleep(random.uniform(0.5, 1.5))
+
+    if not line:
+        return
+
+    use_reply = incoming_message.content.strip().endswith("?")
+    try:
+        if use_reply:
+            await incoming_message.reply(f"{STARLIGHT_EMOJI} {line}")
+        else:
+            await channel.send(f"{STARLIGHT_EMOJI} {line}")
+    except Exception as e:
+        print(f"Failed to send Starlight's line: {e}")
 
 
 @bot.event
@@ -521,13 +622,19 @@ async def on_guild_join(guild):
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
+    if message.author.id == bot.user.id:
         return
 
     if not message.guild:
         await bot.process_commands(message)
         return
 
+    # Another bot posting in #the-architects — likely Moonlight
+    if message.author.bot and message.channel.name == ARCHITECTS_CHANNEL_NAME:
+        asyncio.create_task(starlight_turn(message.channel, message))
+        return
+
+    # Reset linger for tracked text channels
     if message.channel.id in created_channels:
         reset_linger_text(message.channel.id, message.guild.id)
 
@@ -718,6 +825,162 @@ async def checkchamber(ctx):
 
 
 @bot.command()
+async def createchannel(ctx, *, args: str = None):
+    if not args or len(args.split()) < 2:
+        await tier_reply(ctx, "Usage: `!createchannel <name> <description>`.")
+        return
+    parts = args.split(maxsplit=1)
+    name = slugify(parts[0])
+    description = parts[1]
+    try:
+        channel = await ctx.guild.create_text_channel(
+            name=name,
+            topic=description,
+            reason=f"Starlight: channel created by {ctx.author}",
+            position=0,
+        )
+    except discord.Forbidden:
+        await tier_reply(ctx, "I couldn't create the channel — I need Manage Channels permission.")
+        return
+    except Exception as e:
+        print(f"createchannel failed: {e}")
+        await tier_reply(ctx, "Something went wrong creating the channel.")
+        return
+    try:
+        await channel.set_permissions(ctx.author, manage_channels=True, reason="Starlight: channel owner")
+    except discord.Forbidden:
+        pass
+    role, was_created = await get_or_create_enlightened_role(ctx.guild, ctx.author)
+    schedule_linger(channel, ctx.author.id, kind="text")
+    if role and was_created:
+        note = f" You've been given {role.mention}."
+    elif role:
+        note = f" You kept your {role.mention} role."
+    else:
+        note = ""
+    await tier_reply(ctx, f"Created {channel.mention}.{note}")
+
+
+@bot.command()
+async def createforum(ctx, *, args: str = None):
+    if not args or len(args.split()) < 2:
+        await tier_reply(ctx, "Usage: `!createforum <name> <description>`.")
+        return
+    parts = args.split(maxsplit=1)
+    name = slugify(parts[0])
+    description = parts[1]
+    try:
+        channel = await ctx.guild.create_forum(
+            name=name,
+            topic=description,
+            reason=f"Starlight: forum created by {ctx.author}",
+            position=0,
+        )
+    except discord.Forbidden:
+        await tier_reply(ctx, "I couldn't create the forum — I need Manage Channels permission.")
+        return
+    except Exception as e:
+        print(f"createforum failed: {e}")
+        await tier_reply(ctx, "Something went wrong creating the forum.")
+        return
+    try:
+        await channel.set_permissions(ctx.author, manage_channels=True, reason="Starlight: forum owner")
+    except discord.Forbidden:
+        pass
+    role, was_created = await get_or_create_enlightened_role(ctx.guild, ctx.author)
+    schedule_linger(channel, ctx.author.id, kind="text")
+    if role and was_created:
+        note = f" You've been given {role.mention}."
+    elif role:
+        note = f" You kept your {role.mention} role."
+    else:
+        note = ""
+    await tier_reply(ctx, f"Created {channel.mention}.{note}")
+
+
+@bot.command()
+async def createvc(ctx, *, raw_name: str = None):
+    if not raw_name:
+        await tier_reply(ctx, "Usage: `!createvc <name>`.")
+        return
+    name = slugify(raw_name)
+    category = discord.utils.get(ctx.guild.categories, name="Voice Channels")
+    if category is None:
+        try:
+            category = await ctx.guild.create_category(
+                name="Voice Channels",
+                reason="Starlight: auto-created voice category",
+            )
+        except discord.Forbidden:
+            category = None
+        except Exception as e:
+            print(f"Category creation failed: {e}")
+            category = None
+    try:
+        channel = await ctx.guild.create_voice_channel(
+            name=name,
+            category=category,
+            reason=f"Starlight: VC created by {ctx.author}",
+            position=10000,
+        )
+    except discord.Forbidden:
+        await tier_reply(ctx, "I couldn't create the VC — I need Manage Channels permission.")
+        return
+    except Exception as e:
+        print(f"createvc failed: {e}")
+        await tier_reply(ctx, "Something went wrong creating the VC.")
+        return
+    schedule_linger(channel, ctx.author.id, kind="vc")
+    moved = False
+    if ctx.author.voice is not None:
+        try:
+            await ctx.author.move_to(channel, reason="Starlight: pulled into their created VC")
+            moved = True
+        except discord.Forbidden:
+            pass
+        except Exception as e:
+            print(f"Move to VC failed: {e}")
+    if not moved:
+        try:
+            invite = await channel.create_invite(
+                max_age=60,
+                max_uses=1,
+                    max_age=60,
+                max_uses=1,
+                reason="Starlight: VC join invite",
+            )
+            await tier_reply(ctx, f"Created {channel.mention}. {ctx.author.mention} join here: {invite.url}")
+            return
+        except discord.Forbidden:
+            pass
+        except Exception as e:
+            print(f"VC invite creation failed: {e}")
+    await tier_reply(ctx, f"Created {channel.mention}.")
+
+
+@bot.command()
+@commands.has_permissions(manage_guild=True)
+async def enablelinger(ctx):
+    if linger_disabled.get(ctx.guild.id, False) is True:
+        await tier_reply(ctx, "Lingering is already toggled off.")
+        return
+    linger_disabled[ctx.guild.id] = True
+    for cid in list(created_channels.keys()):
+        cancel_linger(cid)
+    await tier_reply(ctx, "Lingering has been turned off — created channels will now stay forever.")
+
+
+@bot.command()
+@commands.has_permissions(manage_guild=True)
+async def disablelinger(ctx):
+    if linger_disabled.get(ctx.guild.id, False) is False:
+        await tier_reply(ctx, "Lingering is already toggled on.")
+        return
+    linger_disabled[ctx.guild.id] = False
+    await tier_reply(ctx, "Lingering has been turned on — created channels will auto-delete after their time runs out.")
+
+
+@bot.command()
 async def cat(ctx):
     async with aiohttp.ClientSession() as session:
         try:
@@ -760,164 +1023,6 @@ async def credits(ctx):
     )
 
 
-# ----- CREATION COMMANDS -----
-
-@bot.command()
-async def createchannel(ctx, *, args: str = None):
-    if not args or len(args.split()) < 2:
-        await tier_reply(ctx, "Usage: `!createchannel <name> <description>`.")
-        return
-
-    parts = args.split(maxsplit=1)
-    name = slugify(parts[0])
-    description = parts[1]
-
-    try:
-        channel = await ctx.guild.create_text_channel(
-            name=name,
-            topic=description,
-            reason=f"Starlight: channel created by {ctx.author}",
-            position=0,
-        )
-    except discord.Forbidden:
-        await tier_reply(ctx, "I couldn't create the channel — I need Manage Channels permission.")
-        return
-    except Exception as e:
-        print(f"createchannel failed: {e}")
-        await tier_reply(ctx, "Something went wrong creating the channel.")
-        return
-
-    try:
-        await channel.set_permissions(ctx.author, manage_channels=True, reason="Starlight: channel owner")
-    except discord.Forbidden:
-        pass
-
-    role, was_created = await get_or_create_enlightened_role(ctx.guild, ctx.author)
-
-    schedule_linger(channel, ctx.author.id, kind="text")
-
-    if role and was_created:
-        note = f" You've been given {role.mention}."
-    elif role:
-        note = f" You kept your {role.mention} role."
-    else:
-        note = ""
-    await tier_reply(ctx, f"Created {channel.mention}.{note}")
-
-
-@bot.command()
-async def createforum(ctx, *, args: str = None):
-    if not args or len(args.split()) < 2:
-        await tier_reply(ctx, "Usage: `!createforum <name> <description>`.")
-        return
-
-    parts = args.split(maxsplit=1)
-    name = slugify(parts[0])
-    description = parts[1]
-
-    try:
-        channel = await ctx.guild.create_forum(
-            name=name,
-            topic=description,
-            reason=f"Starlight: forum created by {ctx.author}",
-            position=0,
-        )
-    except discord.Forbidden:
-        await tier_reply(ctx, "I couldn't create the forum — I need Manage Channels permission.")
-        return
-    except Exception as e:
-        print(f"createforum failed: {e}")
-        await tier_reply(ctx, "Something went wrong creating the forum.")
-        return
-
-    try:
-        await channel.set_permissions(ctx.author, manage_channels=True, reason="Starlight: forum owner")
-    except discord.Forbidden:
-        pass
-
-    role, was_created = await get_or_create_enlightened_role(ctx.guild, ctx.author)
-
-    schedule_linger(channel, ctx.author.id, kind="text")
-
-    if role and was_created:
-        note = f" You've been given {role.mention}."
-    elif role:
-        note = f" You kept your {role.mention} role."
-    else:
-        note = ""
-    await tier_reply(ctx, f"Created {channel.mention}.{note}")
-
-
-@bot.command()
-async def createvc(ctx, *, raw_name: str = None):
-    if not raw_name:
-        await tier_reply(ctx, "Usage: `!createvc <name>`.")
-        return
-
-    name = slugify(raw_name)
-
-    category = discord.utils.get(ctx.guild.categories, name="Voice Channels")
-    if category is None:
-        try:
-            category = await ctx.guild.create_category(
-                name="Voice Channels",
-                reason="Starlight: auto-created voice category",
-            )
-        except discord.Forbidden:
-            category = None
-        except Exception as e:
-            print(f"Category creation failed: {e}")
-            category = None
-
-    try:
-        channel = await ctx.guild.create_voice_channel(
-            name=name,
-            category=category,
-            reason=f"Starlight: VC created by {ctx.author}",
-            position=10000,
-        )
-    except discord.Forbidden:
-        await tier_reply(ctx, "I couldn't create the VC — I need Manage Channels permission.")
-        return
-    except Exception as e:
-        print(f"createvc failed: {e}")
-        await tier_reply(ctx, "Something went wrong creating the VC.")
-        return
-
-    schedule_linger(channel, ctx.author.id, kind="vc")
-
-    try:
-        await ctx.author.move_to(channel)
-    except discord.Forbidden:
-        pass
-    except Exception as e:
-        print(f"Move to VC failed: {e}")
-
-    await tier_reply(ctx, f"Created {channel.mention}.")
-
-
-@bot.command()
-@commands.has_permissions(manage_guild=True)
-async def enablelinger(ctx):
-    if linger_disabled.get(ctx.guild.id, False) is True:
-        await tier_reply(ctx, "Lingering is already toggled off.")
-        return
-    linger_disabled[ctx.guild.id] = True
-    for cid in list(created_channels.keys()):
-        cancel_linger(cid)
-    await tier_reply(ctx, "Lingering has been turned off — created channels will now stay forever.")
-
-
-@bot.command()
-@commands.has_permissions(manage_guild=True)
-async def disablelinger(ctx):
-    if linger_disabled.get(ctx.guild.id, False) is False:
-        await tier_reply(ctx, "Lingering is already toggled on.")
-        return
-    linger_disabled[ctx.guild.id] = False
-    await tier_reply(ctx, "Lingering has been turned on — created channels will auto-delete after their time runs out.")
-
-
 @bot.tree.command(name="help", description="Shows all of Starlight's commands")
 async def help_slash(interaction: discord.Interaction):
     embed, _ = build_help_embed("all", 0)
@@ -930,5 +1035,6 @@ try:
 except Exception:
     print("=== BOT CRASHED ===")
     print(f"TOKEN present: {bool(TOKEN)}")
+    print(f"GROQ present: {bool(GROQ_API_KEY)}")
     traceback.print_exc()
     raise
