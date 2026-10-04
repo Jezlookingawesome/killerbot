@@ -45,7 +45,7 @@ HELP_COLOR = discord.Color.from_rgb(255, 200, 60)
 
 ARCHITECTS_CHANNEL_NAME = "the-architects"
 ARCHITECT_MODEL = "openai/gpt-oss-120b"
-ARCHITECT_MESSAGE_DELAY = 2
+ARCHITECT_MESSAGE_DELAY = 0
 ARCHITECT_MAX_EXCHANGES = 20
 ARCHITECT_TIMEOUT = 5 * 60
 
@@ -653,7 +653,6 @@ async def on_message(message):
             conv_started_at[message.guild.id] = time.time()
             conv_exchanges[message.guild.id] = conv_exchanges.get(message.guild.id, 0)
             conv_last_speaker[message.guild.id] = "moonlight"
-            conv_last_msg_time[message.guild.id] = time.time()
         asyncio.create_task(starlight_turn(message.channel, message))
         return
 
