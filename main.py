@@ -245,7 +245,7 @@ def tier_emoji(member) -> str:
     if perms.administrator:
         return TIER_BARREL
     mod_perms = (
-        perms.manage_messages or perms.manage_members or perms.manage_channels
+        perms.manage_messages or perms.manage_channels
         or perms.manage_roles or perms.manage_webhooks or perms.manage_guild
         or perms.kick_members or perms.ban_members
     )
