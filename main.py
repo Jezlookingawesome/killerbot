@@ -46,7 +46,7 @@ HELP_COLOR = discord.Color.from_rgb(255, 200, 60)
 ARCHITECTS_CHANNEL_NAME = "the-architects"
 ARCHITECT_MODEL = "openai/gpt-oss-120b"
 ARCHITECT_MESSAGE_DELAY = 0
-ARCHITECT_MAX_EXCHANGES = 20
+ARCHITECT_MAX_EXCHANGES = 10
 ARCHITECT_TIMEOUT = 5 * 60
 
 conv_active = {}
@@ -577,7 +577,7 @@ async def generate_architect_line(speaker: str, context_messages: list) -> str:
             messages=messages,
             max_tokens=300,
             reasoning_effort="low",
-            temperature=0.9,
+            temperature=0.75,
         )
 
     try:
