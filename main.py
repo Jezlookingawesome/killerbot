@@ -1057,3 +1057,11 @@ async def on_command_error(ctx, error):
         await tier_reply(ctx, "That's not a valid argument.")
     else:
         print(f"Command error: {error}")
+try:
+    bot.run(TOKEN)
+except Exception:
+    print("=== BOT CRASHED ===")
+    print(f"TOKEN present: {bool(TOKEN)}")
+    print(f"GROQ present: {bool(GROQ_API_KEY)}")
+    traceback.print_exc()
+    raise
