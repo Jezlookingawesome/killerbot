@@ -32,6 +32,7 @@ roulette_odds = {}
 gambling_mode = {}
 
 DEVELOPER_ID = 1478853756874395762
+RED_LIGHT_ID = 1556391554221080586
 JACKPOT_ROLE_NAME = "JACKPOT☘️"
 JACKPOT_ROLE_COLOR = discord.Color.from_rgb(0, 255, 0)
 
@@ -680,18 +681,25 @@ async def on_message(message):
         return
 
     # Another bot posting in #the-architects — likely Moonlight
-    if message.author.bot and message.channel.name == ARCHITECTS_CHANNEL_NAME:
-        # Don't restart if a conversation was recently ended
-        if time.time() < conv_cooldown_until.get(message.guild.id, 0):
-            return
-        # Auto-engage if another bot just spoke
-        if not conv_active.get(message.guild.id):
-            conv_active[message.guild.id] = True
-            conv_started_at[message.guild.id] = time.time()
-            conv_exchanges[message.guild.id] = conv_exchanges.get(message.guild.id, 0)
-        conv_last_speaker[message.guild.id] = "moonlight"
-        asyncio.create_task(starlight_turn(message.channel, message))
+if message.author.bot and message.channel.name == ARCHITECTS_CHANNEL_NAME:
+    # If it's Red Light, just react and don't engage
+    if message.author.id == RED_LIGHT_ID:
+        try:
+            await message.add_reaction("❓")
+        except Exception:
+            pass
         return
+    # Don't restart if a conversation was recently ended
+    if time.time() < conv_cooldown_until.get(message.guild.id, 0):
+        return
+    # Auto-engage if another bot just spoke
+    if not conv_active.get(message.guild.id):
+        conv_active[message.guild.id] = True
+        conv_started_at[message.guild.id] = time.time()
+        conv_exchanges[message.guild.id] = conv_exchanges.get(message.guild.id, 0)
+    conv_last_speaker[message.guild.id] = "moonlight"
+    asyncio.create_task(starlight_turn(message.channel, message))
+    return
 
     # Reset linger for tracked text channels
     if message.channel.id in created_channels:
