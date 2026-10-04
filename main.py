@@ -945,8 +945,6 @@ async def createvc(ctx, *, raw_name: str = None):
             invite = await channel.create_invite(
                 max_age=60,
                 max_uses=1,
-                    max_age=60,
-                max_uses=1,
                 reason="Starlight: VC join invite",
             )
             await tier_reply(ctx, f"Created {channel.mention}. {ctx.author.mention} join here: {invite.url}")
