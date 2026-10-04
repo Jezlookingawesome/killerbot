@@ -54,6 +54,7 @@ conv_started_at = {}
 conv_exchanges = {}
 conv_last_speaker = {}
 conv_last_msg_time = {}
+conv_cooldown_until = {}
 conv_lock = asyncio.Lock()
 
 START_TIME = time.time()
