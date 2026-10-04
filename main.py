@@ -652,7 +652,7 @@ async def on_message(message):
             conv_active[message.guild.id] = True
             conv_started_at[message.guild.id] = time.time()
             conv_exchanges[message.guild.id] = conv_exchanges.get(message.guild.id, 0)
-            conv_last_speaker[message.guild.id] = "moonlight"
+        conv_last_speaker[message.guild.id] = "moonlight"
         asyncio.create_task(starlight_turn(message.channel, message))
         return
 
