@@ -139,7 +139,7 @@ def build_help_embed(category_key: str, page: int):
     title = f"{STARLIGHT_EMOJI} STARLIGHT — {get_category_label(category_key).upper()}"
     embed = discord.Embed(
         title=title,
-        description=f"**Prefix: !**\nPage {page + 1}/{total_pages}",
+        description=f"**Prefix: star!**\nPage {page + 1}/{total_pages}",
         color=HELP_COLOR,
     )
     for usage, desc in chunk:
