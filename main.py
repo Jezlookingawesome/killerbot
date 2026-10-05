@@ -1215,7 +1215,7 @@ async def credits(ctx):
 async def say(ctx, *, text: str = None):
   if text is None:
       await ctx.reply(f"Usage: `star!say <text>` — {STARLIGHT_EMOJI}")
-        return
+      return
     try:
         await ctx.message.delete()
     except Exception:
