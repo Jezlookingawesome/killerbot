@@ -578,7 +578,7 @@ async def generate_architect_line(speaker: str, context_messages: list) -> str:
         return None
     system_prompt = STARLIGHT_SYSTEM_PROMPT if speaker == "starlight" else MOONLIGHT_SYSTEM_PROMPT_FOR_STARLIGHT
     messages = [{"role": "system", "content": system_prompt}]
-    for name, content in context_messages[-8:]:
+    for name, content in context_messages[-4:]:
         role = "assistant" if name == speaker else "user"
         messages.append({"role": role, "content": content})
 
