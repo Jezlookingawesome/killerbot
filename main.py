@@ -1216,12 +1216,12 @@ async def say(ctx, *, text: str = None):
   if text is None:
       await ctx.reply(f"Usage: `star!say <text>` — {STARLIGHT_EMOJI}")
       return
-    try:
-        await ctx.message.delete()
-    except Exception:
-        pass
-    tier = tier_emoji(ctx.author)
-    await ctx.send(f"{STARLIGHT_EMOJI} {tier} {text}")
+  try:
+    await ctx.message.delete()
+  except Exception:
+    pass
+  tier = tier_emoji(ctx.author)
+  await ctx.send(f"{STARLIGHT_EMOJI} {tier} {text}")
 
 
 @bot.tree.command(name="help", description="Shows all of Starlight's commands")
