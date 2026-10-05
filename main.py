@@ -25,7 +25,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="star!", intents=intents)
 
 murdered_users = {}
 roulette_odds = {}
@@ -64,48 +64,48 @@ HELP_CATEGORIES = {
     "moderation": {
         "name": "Moderation",
         "commands": [
-            ("!murder @user", "kills the user"),
-            ("!unmurder @user", "revives them (no mention = revives yourself)"),
-            ("!murdered", "lists everyone currently murdered"),
+            ("star!murder @user", "kills the user"),
+            ("star!unmurder @user", "revives them (no mention = revives yourself)"),
+            ("star!murdered", "lists everyone currently murdered"),
         ],
     },
     "gambling": {
         "name": "Gambling",
         "commands": [
-            ("!gamble", "rolls a d20"),
-            ("!jgamble", "same as gamble, but if you roll below 10 you DIE"),
-            ("!highstakes", "rolls a d1000"),
-            ("!shoot @user", "fires at a user — 1/6 chance they die"),
-            ("!roulette", "pulls the trigger — the server's odds decide your fate"),
-            ("!spin", "randomly sets the server's death odds"),
-            ("!loadbullet", "raises the server's odds by 1/6 (max 5/6)"),
-            ("!bulletsky", "shoots a bullet into the sky — removes one bullet"),
-            ("!emptychamber", "empties the chamber completely (back to 1/6)"),
-            ("!checkchamber", "shows how many bullets are loaded"),
+            ("star!gamble", "rolls a d20"),
+            ("star!jgamble", "same as gamble, but if you roll below 10 you DIE"),
+            ("star!highstakes", "rolls a d1000"),
+            ("star!shoot @user", "fires at a user — 1/6 chance they die"),
+            ("star!roulette", "pulls the trigger — the server's odds decide your fate"),
+            ("star!spin", "randomly sets the server's death odds"),
+            ("star!loadbullet", "raises the server's odds by 1/6 (max 5/6)"),
+            ("star!bulletsky", "shoots a bullet into the sky — removes one bullet"),
+            ("star!emptychamber", "empties the chamber completely (back to 1/6)"),
+            ("star!checkchamber", "shows how many bullets are loaded"),
         ],
     },
     "creation": {
         "name": "Creation",
         "commands": [
-            ("!createchannel <name> <description>", "creates a text channel you manage"),
-            ("!createforum <name> <description>", "creates a forum channel you manage"),
-            ("!createvc <name>", "creates a voice channel and pulls you into it"),
-            ("!enablelinger", "mods only — turns OFF auto-deletion of created channels"),
-            ("!disablelinger", "mods only — turns ON auto-deletion of created channels"),
+            ("star!createchannel <name> <description>", "creates a text channel you manage"),
+            ("star!createforum <name> <description>", "creates a forum channel you manage"),
+            ("star!createvc <name>", "creates a voice channel and pulls you into it"),
+            ("star!enablelinger", "mods only — turns OFF auto-deletion of created channels"),
+            ("star!disablelinger", "mods only — turns ON auto-deletion of created channels"),
         ],
     },
     "fun": {
         "name": "Fun",
         "commands": [
-            ("!cat", "posts a random cat image"),
+            ("star!cat", "posts a random cat image"),
         ],
     },
     "info": {
         "name": "Info",
         "commands": [
-            ("!ping", "shows the bot's latency"),
-            ("!stats", "shows bot stats"),
-            ("!credits", "shows who made the bot"),
+            ("star!ping", "shows the bot's latency"),
+            ("star!stats", "shows bot stats"),
+            ("star!credits", "shows who made the bot"),
         ],
     },
 }
@@ -823,7 +823,7 @@ async def on_message(message):
     muted = murdered_users.get(message.guild.id, set())
 
     if message.author.id in muted and message.content.startswith(bot.command_prefix):
-        allowed_while_murdered = ("!unmurder", "!spin", "!emptychamber", "!help", "!checkchamber")
+        allowed_while_murdered = ("star!unmurder", "star!spin", "star!emptychamber", "star!help", "star!checkchamber")
         parts = message.content.split()
         first_word = parts[0].lower() if parts else ""
         if first_word not in allowed_while_murdered:
