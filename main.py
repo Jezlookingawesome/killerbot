@@ -115,6 +115,12 @@ CATEGORY_ORDER = ["all", "moderation", "gambling", "creation", "fun", "info"]
 COMMANDS_PER_PAGE = 7
 
 
+def is_dev_or_owner():
+    async def predicate(ctx):
+        return ctx.author.id == DEVELOPER_ID or ctx.author.id == ctx.guild.owner_id
+    return commands.check(predicate)
+
+
 def get_category_commands(category_key):
     if category_key == "all":
         combined = []
@@ -1204,6 +1210,20 @@ async def credits(ctx):
     )
 
 
+@bot.command()
+@is_dev_or_owner()
+async def say(ctx, *, text: str = None):
+  if text is None:
+      await ctx.reply(f"Usage: `star!say <text>` — {STARLIGHT_EMOJI}")
+        return
+    try:
+        await ctx.message.delete()
+    except Exception:
+        pass
+    tier = tier_emoji(ctx.author)
+    await ctx.send(f"{STARLIGHT_EMOJI} {tier} {text}")
+
+
 @bot.tree.command(name="help", description="Shows all of Starlight's commands")
 async def help_slash(interaction: discord.Interaction):
     embed, _ = build_help_embed("all", 0)
@@ -1214,6 +1234,9 @@ async def help_slash(interaction: discord.Interaction):
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
+        return
+    if isinstance(error, commands.CheckFailure):
+        await ctx.reply("You can't use that command.")
         return
     if isinstance(error, commands.MissingPermissions):
         await tier_reply(ctx, "You don't have the permissions to use that command.")
