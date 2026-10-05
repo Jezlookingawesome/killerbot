@@ -26,6 +26,7 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="star!", intents=intents)
+bot.remove_command("help")
 
 murdered_users = {}
 roulette_odds = {}
@@ -823,7 +824,7 @@ async def on_message(message):
     muted = murdered_users.get(message.guild.id, set())
 
     if message.author.id in muted and message.content.startswith(bot.command_prefix):
-        allowed_while_murdered = ("star!unmurder", "star!spin", "star!emptychamber", "star!help", "star!checkchamber")
+        allowed_while_murdered = ("star!unmurder", "star!spin", "star!emptychamber", "star!checkchamber")
         parts = message.content.split()
         first_word = parts[0].lower() if parts else ""
         if first_word not in allowed_while_murdered:
